@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solara Bay — Open World Crime Game</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1c2c;
+    font-family: "Segoe UI", Verdana, sans-serif; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; display: none;
+    text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+  #hud.on { display: block; }
+  .panel { background: rgba(0,0,0,.45); border-radius: 8px; padding: 8px 12px; }
+  #healthBox { position: absolute; top: 12px; left: 12px; }
+  #healthBar { width: 180px; height: 14px; background: #222; border: 1px solid #fff3; border-radius: 7px; overflow: hidden; margin-top: 4px; }
+  #healthFill { height: 100%; width: 100%; background: linear-gradient(90deg,#37d67a,#a5e635); }
+  #cashBox { position: absolute; top: 12px; left: 220px; font-size: 20px; font-weight: bold; color: #7dff9e; }
+  #stars { position: absolute; top: 12px; right: 12px; font-size: 30px; letter-spacing: 4px; color: #ffd23e; }
+  #stars .off { color: rgba(255,255,255,.25); }
+  #objective { position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    font-size: 15px; max-width: 46%; text-align: center; }
+  #objective b { color: #ffd23e; }
+  #minimap { position: absolute; left: 12px; bottom: 12px; border: 2px solid rgba(255,255,255,.5);
+    border-radius: 50%; background: #0a2436; }
+  #speedo { position: absolute; right: 16px; bottom: 16px; font-size: 26px; font-weight: bold; display: none; }
+  #speedo small { font-size: 13px; color: #cfe8ff; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px;
+    display: none; }
+  #crosshair:before, #crosshair:after { content: ""; position: absolute; background: #fff; }
+  #crosshair:before { left: 8px; top: 0; width: 2px; height: 18px; }
+  #crosshair:after { top: 8px; left: 0; width: 18px; height: 2px; }
+  #prompt { position: absolute; left: 50%; bottom: 18%; transform: translateX(-50%);
+    font-size: 17px; display: none; }
+  #prompt b { color: #ffd23e; }
+  #dialogue { position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%);
+    width: 520px; max-width: 80%; font-size: 15px; display: none; line-height: 1.45; }
+  #dialogue .who { color: #ffd23e; font-weight: bold; }
+  #toast { position: absolute; left: 50%; top: 64px; transform: translateX(-50%);
+    font-size: 18px; font-weight: bold; color: #7dff9e; display: none; }
+  #damage { position: fixed; inset: 0; pointer-events: none; display: none;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(255,0,0,.55) 100%); }
+  .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; color: #fff; text-align: center; z-index: 5;
+    background: linear-gradient(180deg, rgba(6,30,48,.88), rgba(6,30,48,.72)); }
+  .screen h1 { font-size: 64px; margin: 0; letter-spacing: 2px; color: #ffd23e;
+    text-shadow: 0 4px 0 #b3541e, 0 8px 24px rgba(0,0,0,.6); }
+  .screen h2 { font-weight: normal; color: #9fd8ff; margin: 6px 0 18px; font-size: 20px; }
+  .screen p { max-width: 620px; line-height: 1.55; color: #e8f4ff; }
+  .screen .keys { font-size: 14px; color: #cfe8ff; background: rgba(0,0,0,.4);
+    border-radius: 8px; padding: 12px 18px; text-align: left; line-height: 1.9; }
+  .screen button { pointer-events: auto; cursor: pointer; margin-top: 22px; font-size: 22px;
+    padding: 12px 42px; border-radius: 10px; border: none; background: #ffd23e; color: #231303;
+    font-weight: bold; box-shadow: 0 4px 0 #b3541e; }
+  .screen button:hover { background: #ffe27a; }
+  .screen button.secondary { background: #2b6ea3; color: #fff; box-shadow: 0 4px 0 #173f5f; font-size: 17px; padding: 10px 28px; }
+  #pauseScreen, #overScreen, #winScreen { display: none; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="Solara Bay: an open-world crime game. Explore the city on foot or by car, take on missions, and watch out for the police."></canvas>
+<div id="hud">
+  <div id="healthBox" class="panel">HEALTH<div id="healthBar"><div id="healthFill"></div></div></div>
+  <div id="cashBox" class="panel">$<span id="cash">0</span></div>
+  <div id="stars"></div>
+  <div id="objective" class="panel"><b id="missionName">SOLARA BAY</b><br><span id="missionText">Free roam — explore the city.</span></div>
+  <canvas id="minimap" width="180" height="180"></canvas>
+  <div id="speedo"><span id="speed">0</span> <small>km/h</small></div>
+  <div id="crosshair"></div>
+  <div id="prompt" class="panel"></div>
+  <div id="dialogue" class="panel"><span class="who" id="dialogueWho"></span> <span id="dialogueText"></span><br><small>press ENTER to continue</small></div>
+  <div id="toast"></div>
+</div>
+<div id="damage"></div>
+
+<div id="startScreen" class="screen">
+  <h1>SOLARA BAY</h1>
+  <h2>An open-world crime story &middot; a sun-soaked coastal city</h2>
+  <p>You are <b>Marlo Vance</b>, a driver-for-hire with a fast car and faster debts.
+  Your fixer <b>Rico Salas</b> has work for you — five jobs, one big score, and a
+  whole city that does not forgive mistakes. Steal cars, outrun the Solara Bay
+  Police, and take the jobs nobody else will touch.</p>
+  <div class="keys">
+    <b>W A S D</b> move / drive &nbsp;·&nbsp; <b>Mouse</b> look &nbsp;·&nbsp; <b>SPACE</b> handbrake<br>
+    <b>E</b> enter / steal car &nbsp;·&nbsp; <b>Q</b> switch fists / pistol &nbsp;·&nbsp; <b>Click</b> punch / shoot<br>
+    <b>SHIFT</b> sprint &nbsp;·&nbsp; <b>P / ESC</b> pause &nbsp;·&nbsp; <b>M</b> mission list
+  </div>
+  <button id="startBtn">START GAME</button>
+  <button id="continueBtn" class="secondary" style="display:none">CONTINUE SAVED GAME</button>
+  <p style="font-size:13px;color:#9fb8cc">Progress saves automatically. An original game — no real city, person or brand.</p>
+</div>
+
+<div id="pauseScreen" class="screen">
+  <h1 style="font-size:44px">PAUSED</h1>
+  <p>Solara Bay waits for no one. Well — right now it does.</p>
+  <button id="resumeBtn">RESUME</button>
+  <button id="quitBtn" class="secondary">SAVE &amp; QUIT TO MENU</button>
+</div>
+
+<div id="overScreen" class="screen">
+  <h1 style="font-size:44px;color:#ff5a5a">BUSTED / DOWN</h1>
+  <p id="overText">The Solara Bay Police caught up with you.</p>
+  <button id="retryBtn">TRY AGAIN</button>
+</div>
+
+<div id="winScreen" class="screen">
+  <h1 style="font-size:44px">THE BIG SCORE</h1>
+  <p>You pulled it off, Marlo. Rico is already spending his cut. Solara Bay is yours —
+  keep the engine running, because the city always has one more job.</p>
+  <button id="freeRoamBtn">KEEP PLAYING (FREE ROAM)</button>
+</div>
+
+<p id="status" role="status" aria-live="polite"></p>
+<script src="./vendor/three.min.js"></script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
